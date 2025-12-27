@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ACCESS BLOCKED</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#020617;
+  --panel:#0b1220;
+  --red:#ef4444;
+  --yellow:#facc15;
+  --cyan:#22d3ee;
+  --green:#00ff88;
+  --text:#e5e7eb;
+  --muted:#9ca3af;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  overflow-x:hidden;
+  overflow-y:auto;
+  
+}
+
+body.scroll-lock{overflow:hidden}
+
+/* Hide scrollbars but keep scrolling */
+html, body, #termOut, .miniTerm{
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#termOut::-webkit-scrollbar,
+.miniTerm::-webkit-scrollbar{
+  width:0;
+  height:0;
+}
+
+/* ======= SUBTLE CRT / SCANLINES (HACKER FEEL) ======= */
+.scanlines{
+  position:fixed; inset:0;
+  background:linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size:100% 3px;
+  pointer-events:none;
+  z-index:5;
+  mix-blend-mode:overlay;
+}
+.crt{
+  position:fixed; inset:0;
+  pointer-events:none;
+  z-index:6;
+  background:radial-gradient(circle at center, transparent 0 55%, rgba(0,0,0,.35) 75%, rgba(0,0,0,.65) 100%);
+  animation:crtFlicker 6s infinite;
+}
+@keyframes crtFlicker{
+  0%,100%{opacity:.28}
+  45%{opacity:.18}
+  55%{opacity:.33}
+}
+
+/* ================= LOADING OVERLAY ================= */
+#loader{
+  position:fixed;
+  inset:0;
+  background:#020617;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  font-family:'Share Tech Mono',monospace;
+  color:var(--green);
+  padding:18px;
+}
+
+#terminal{
+  width:100%;
+  max-width:860px;
+  background:#000;
+  border:1px solid rgba(0,255,136,.7);
+  padding:18px 18px 12px;
+  box-shadow:0 0 40px rgba(0,255,136,.25);
+  border-radius:10px;
+  position:relative;
+}
+
+.term-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:10px;
+  color:#a7f3d0;
+  opacity:.95;
+  font-size:12px;
+}
+.pills{display:flex; gap:6px; align-items:center}
+.pill{width:10px;height:10px;border-radius:50%}
+.pill.red{background:#ff3355}
+.pill.yel{background:#ffd000}
+.pill.grn{background:#00ff88}
+
+#termOut{
+  height:min(55vh, 360px);
+  overflow:auto;
+  white-space:pre-wrap;
+  line-height:1.35;
+  font-size:13px;
+  padding-right:6px;
+}
+
+.cursor::after{
+  content:"▋";
+  margin-left:2px;
+  animation:blink 1s infinite;
+}
+
+@keyframes blink{50%{opacity:0}}
+
+.term-footer{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-top:12px;
+  font-size:12px;
+  color:#86efac;
+  opacity:.9;
+}
+
+.progress{
+  width:220px; max-width:40vw;
+  height:8px;
+  border:1px solid rgba(0,255,136,.6);
+  border-radius:6px;
+  overflow:hidden;
+  background:rgba(0,255,136,.08);
+}
+.progress > div{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg, rgba(0,255,136,.95), rgba(34,211,238,.95));
+  transition:width .2s ease;
+}
+
+.kioskBtn{
+  appearance:none;
+  border:1px solid rgba(0,255,136,.65);
+  color:#d1fae5;
+  background:rgba(0,255,136,.08);
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-family:'Share Tech Mono',monospace;
+  font-size:12px;
+}
+.kioskBtn:hover{background:rgba(0,255,136,.14)}
+
+.soundBtn{
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  z-index:10000;
+  appearance:none;
+  border:1px solid rgba(0,255,136,.65);
+  color:#d1fae5;
+  background:rgba(2,6,23,.7);
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-family:'Share Tech Mono',monospace;
+  font-size:12px;
+  box-shadow:0 0 22px rgba(0,255,136,.25);
+}
+.soundBtn:hover{background:rgba(0,255,136,.14)}
+.soundBtn.on{
+  border-color:rgba(34,211,238,.7);
+  color:#a7f3d0;
+}
+
+/* ================= MATRIX BACKGROUND ================= */
+canvas{
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  opacity:0.22;
+}
+
+/* ================= MAIN PANEL ================= */
+.panel{
+  max-width:760px;
+  margin:6vh auto;
+  padding:40px;
+  background:linear-gradient(180deg,#020617,#0b1220);
+  border-radius:16px;
+  border:2px solid var(--cyan);
+  box-shadow:0 0 40px rgba(34,211,238,.3);
+  animation:borderPulse 2s infinite alternate;
+  display:none;
+}
+
+@keyframes borderPulse{
+  from{box-shadow:0 0 20px rgba(34,211,238,.3);}
+  to{box-shadow:0 0 60px rgba(34,211,238,.6);}
+}
+
+h1{
+  font-family:'Orbitron',sans-serif;
+  color:var(--red);
+  text-align:center;
+  letter-spacing:2px;
+  margin-bottom:10px;
+}
+
+.owner{
+  text-align:center;
+  font-family:'Orbitron';
+  color:var(--yellow);
+  letter-spacing:2px;
+  margin-bottom:26px;
+}
+
+/* Read-only terminal snippet inside sections */
+.miniTerm{
+  margin-top:10px;
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(34,211,238,.35);
+  border-radius:10px;
+  padding:10px 12px;
+  color:#a7f3d0;
+  font-family:'Share Tech Mono',monospace;
+  font-size:12px;
+  line-height:1.35;
+  max-height:130px;
+  overflow:auto;
+}
+.miniTerm .prompt{color:#67e8f9}
+.miniTerm .bad{color:#fca5a5}
+.miniTerm .ok{color:#86efac}
+
+.section{
+  margin-bottom:22px;
+  padding:20px;
+  border-radius:10px;
+  background:rgba(255,255,255,.03);
+}
+
+.section h2{
+  font-family:'Orbitron';
+  font-size:1rem;
+  margin-bottom:10px;
+  letter-spacing:1px;
+}
+
+.alert{border-left:4px solid var(--red)}
+.warn{border-left:4px solid var(--yellow)}
+.info{border-left:4px solid var(--cyan)}
+
+ul{padding-left:18px;line-height:1.6}
+
+.highlight{color:var(--cyan);font-weight:600}
+
+/* SCAN BAR */
+.scan{
+  height:4px;
+  width:100%;
+  background:#020617;
+  overflow:hidden;
+  border-radius:2px;
+  margin:22px 0;
+}
+.scan::before{
+  content:'';
+  display:block;
+  height:100%;
+  width:30%;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:scan 1.6s infinite;
+}
+@keyframes scan{
+  from{transform:translateX(-100%)}
+  to{transform:translateX(350%)}
+}
+
+.footer{
+  text-align:center;
+  font-size:.85em;
+  color:var(--muted);
+}
+
+.blink{animation:blink 1.4s infinite}
+
+/* Responsive */
+@media (max-width: 600px){
+  .panel{margin:4vh 12px; padding:22px}
+  .section{padding:16px}
+}
+
+/* Prevent selection & typing vibe */
+.noInput{user-select:none}
+</style>
+</head>
+
+<body class="noInput scroll-lock">
+
+<div class="scanlines"></div>
+<div class="crt"></div>
+
+<!-- ================= LOADING SCREEN ================= -->
+<div id="loader">
+  <div id="terminal" role="dialog" aria-label="Security gateway terminal">
+    <div class="term-header">
+      <div class="pills" aria-hidden="true">
+        <span class="pill red"></span><span class="pill yel"></span><span class="pill grn"></span>
+      </div>
+      <div>SECURITY GATEWAY :: BDHN-NODE-01</div>
+      <div id="termClock">--:--:--</div>
+    </div>
+
+    <div id="termOut"></div>
+
+    <div class="term-footer">
+      <div class="progress" aria-label="loading progress"><div id="progBar"></div></div>
+      <button class="kioskBtn" id="kioskBtn">ENTER KIOSK MODE (FULLSCREEN)</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="matrix"></canvas>
+
+<!-- ================= MAIN PAGE ================= -->
+<div class="panel" id="panel">
+
+  <h1 class="blink">🚫 ACCESS BLOCKED</h1>
+  <div class="owner">SECURITY SYSTEM OWNER • BADHON</div>
+
+  <div class="section alert">
+    <h2>SECURITY ALERT</h2>
+    <p>This website is classified as <span class="highlight">UNSAFE</span>.</p>
+    <ul>
+      <li>Pornographic Content</li>
+      <li>Malware / Phishing</li>
+      <li>Tracking or Exploits</li>
+      <li>Suspicious Network Activity</li>
+    </ul>
+
+    <div class="miniTerm" id="miniA" aria-label="Read-only terminal log (security alert)"></div>
+  </div>
+
+  <div class="section warn">
+    <h2>⚠ BYPASS ATTEMPT WARNING</h2>
+    <ul>
+      <li>VPN / Proxy</li>
+      <li>Custom DNS</li>
+      <li>Tor Network</li>
+    </ul>
+    <p>Attempts are logged and monitored.</p>
+
+    <div class="miniTerm" id="miniB" aria-label="Read-only terminal log (bypass warning)"></div>
+  </div>
+
+  <div class="section info">
+    <h2>NETWORK STATUS</h2>
+    <p>Device IP: <span class="highlight" id="ip">Detecting…</span></p>
+    <p>Date & Time: <span class="highlight" id="time"></span></p>
+
+    <div class="miniTerm" id="miniC" aria-label="Read-only terminal log (network status)"></div>
+  </div>
+
+  <div class="scan"></div>
+
+  <div class="footer">
+    Network Administrator: <span class="highlight">Badhon</span><br>
+    All devices are monitored 24/7.
+  </div>
+
+</div>
+
+<!-- ================= AUDIO (UNLOCKS ON FIRST USER ACTION) ================= -->
+<audio id="audioTyping" src="typing.mp3" preload="auto" loop></audio>
+<audio id="audioSiren" src="siren.mp3" preload="auto" loop></audio>
+<button id="soundBtn" class="soundBtn" type="button" aria-pressed="false">
+  SOUND OFF - CLICK TO ENABLE
+</button>
+
+<script>
+/* ====================== HELPERS ====================== */
+const sleep = (ms)=> new Promise(r=>setTimeout(r, ms));
+const pad2 = (n)=> String(n).padStart(2,'0');
+function nowStamp(){
+  const d = new Date();
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+function randHex(n=8){
+  const chars="abcdef0123456789";
+  let s="";
+  for(let i=0;i<n;i++) s += chars[Math.random()*chars.length|0];
+  return s;
+}
+function setProgress(p){
+  document.getElementById("progBar").style.width = Math.max(0, Math.min(100,p)) + "%";
+}
+
+/* ====================== AUDIO ====================== */
+const audioTyping = document.getElementById("audioTyping");
+const audioSiren = document.getElementById("audioSiren");
+const soundBtn = document.getElementById("soundBtn");
+
+const audioState = { unlocked:false, mode:"typing" };
+
+function pauseReset(a){
+  if(!a) return;
+  a.pause();
+  a.currentTime = 0;
+}
+function tryPlay(a){
+  if(!a) return Promise.reject(new Error("audio missing"));
+  const p = a.play();
+  return (p && typeof p.then === "function") ? p : Promise.resolve();
+}
+function playSafe(a){
+  tryPlay(a).catch(()=>{});
+}
+function syncAudio(){
+  if(!audioState.unlocked) return;
+  pauseReset(audioTyping);
+  pauseReset(audioSiren);
+
+  if(audioState.mode === "typing"){
+    if(audioTyping) audioTyping.volume = 0.18;
+    playSafe(audioTyping);
+  }else if(audioState.mode === "main"){
+    if(audioSiren) audioSiren.volume = 0.2;
+    playSafe(audioSiren);
+  }
+}
+function updateSoundButton(){
+  if(!soundBtn) return;
+  if(audioState.unlocked){
+    soundBtn.textContent = "SOUND ON";
+    soundBtn.classList.add("on");
+    soundBtn.setAttribute("aria-pressed","true");
+  }else{
+    soundBtn.textContent = "SOUND OFF - CLICK TO ENABLE";
+    soundBtn.classList.remove("on");
+    soundBtn.setAttribute("aria-pressed","false");
+  }
+}
+function setAudioMode(mode){
+  audioState.mode = mode;
+  syncAudio();
+}
+function unlockAudio(){
+  if(audioState.unlocked) return;
+  audioState.unlocked = true;
+  updateSoundButton();
+  syncAudio();
+}
+async function tryAutoEnable(){
+  if(audioState.unlocked) return;
+  try{
+    if(audioTyping) audioTyping.volume = 0.18;
+    await tryPlay(audioTyping);
+    audioState.unlocked = true;
+    updateSoundButton();
+    syncAudio();
+  }catch(e){
+    updateSoundButton();
+  }
+}
+// Attempt autoplay; if blocked, fallback to user interaction.
+document.addEventListener("click", unlockAudio, { once:true });
+document.addEventListener("keydown", unlockAudio, { once:true });
+document.addEventListener("pointerdown", unlockAudio, { once:true });
+document.addEventListener("touchstart", unlockAudio, { once:true });
+if(soundBtn){
+  soundBtn.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    unlockAudio();
+  });
+}
+updateSoundButton();
+window.addEventListener("load", tryAutoEnable, { once:true });
+
+/* ====================== FULLSCREEN (KIOSK) ====================== */
+async function enterFullscreen(){
+  const el = document.documentElement;
+  try{
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }catch(e){
+    // browser blocked; ignore
+  }
+}
+document.getElementById("kioskBtn").addEventListener("click", enterFullscreen);
+
+// Attempt "best effort" fullscreen on first click anywhere in loader
+document.getElementById("loader").addEventListener("click", ()=> {
+  // if not already fullscreen, try
+  if (!document.fullscreenElement) enterFullscreen();
+}, { once:true });
+
+/* ====================== REALISTIC LOADER TYPING ====================== */
+const termOut = document.getElementById("termOut");
+
+function appendLine(text, cls=""){
+  const div = document.createElement("div");
+  div.className = "line " + cls;
+  div.textContent = text;
+  termOut.appendChild(div);
+  termOut.scrollTop = termOut.scrollHeight;
+}
+
+async function typeLine(prefix, text, speed=18){
+  // type like terminal (character-by-character)
+  const div = document.createElement("div");
+  div.className = "line";
+  termOut.appendChild(div);
+
+  let full = prefix;
+  div.textContent = full;
+  await sleep(120);
+
+  for (let i=0;i<text.length;i++){
+    full += text[i];
+    div.textContent = full + "▋";
+    await sleep(speed + (Math.random()*20|0));
+  }
+  div.textContent = full;
+  termOut.scrollTop = termOut.scrollHeight;
+}
+
+async function loaderSequence(){
+  setAudioMode("typing");
+
+  // Header lines
+  appendLine(`[${nowStamp()}] BDHN-GW :: initializing security modules...`);
+  await sleep(200);
+  setProgress(6);
+
+  await typeLine(`[${nowStamp()}] [+] `, `connecting...`, 22);
+  await sleep(240);
+  setProgress(18);
+
+  await typeLine(`[${nowStamp()}] [+] `, `establishing secure channel (TLS)`, 18);
+  await sleep(260);
+  setProgress(28);
+
+  await typeLine(`[${nowStamp()}] [+] `, `fetching device info...`, 22);
+  await sleep(260);
+  setProgress(42);
+
+  await typeLine(`[${nowStamp()}] [+] `, `dhcp lease check :: OK`, 14);
+  await sleep(140);
+  setProgress(52);
+
+  await typeLine(`[${nowStamp()}] [+] `, `dns policy lookup :: matched`, 16);
+  await sleep(220);
+  setProgress(64);
+
+  await typeLine(`[${nowStamp()}] [!] `, `requesting root access...`, 20);
+  await sleep(260);
+  setProgress(78);
+
+  await typeLine(`[${nowStamp()}] [x] `, `ACCESS DENIED`, 10);
+  setProgress(100);
+
+  appendLine(`[${nowStamp()}] event-id=${randHex(10)} :: action=block :: admin=BADHON`);
+  await sleep(520);
+
+  // Hide loader & show panel
+  document.getElementById("loader").style.display="none";
+  document.getElementById("panel").style.display="block";
+  document.body.classList.remove("scroll-lock");
+  setAudioMode("main");
+
+  // After showing, type inside sections
+  startMiniTerms();
+}
+
+/* Clock in loader */
+setInterval(()=> {
+  document.getElementById("termClock").textContent = nowStamp();
+}, 250);
+
+/* ====================== MINI TERMINALS (READ ONLY) ====================== */
+async function typeInto(el, lines, speed=12){
+  el.innerHTML = "";
+  for (const ln of lines){
+    // type each line
+    const row = document.createElement("div");
+    el.appendChild(row);
+    let s="";
+    for (let i=0;i<ln.length;i++){
+      s += ln[i];
+      row.innerHTML = s + "<span class='cursor'></span>";
+      await sleep(speed + (Math.random()*18|0));
+    }
+    row.innerHTML = s;
+    el.scrollTop = el.scrollHeight;
+    await sleep(120 + (Math.random()*180|0));
+  }
+}
+
+async function startMiniTerms(){
+  const tA = [
+    "<span class='prompt'>badhon@gw</span>:~$ classify --url <span class='bad'>[blocked]</span>",
+    "category=unsafe  score=0.97  policy=STRICT",
+    "reason=porn|malware|tracking|suspicious",
+    "action=<span class='bad'>DENY</span>  log=enabled"
+  ];
+
+  const tB = [
+    "<span class='prompt'>badhon@gw</span>:~$ detect --bypass",
+    "vpn/proxy=<span class='bad'>flagged</span>",
+    "dns-change=<span class='bad'>flagged</span>",
+    "tor=<span class='bad'>flagged</span>",
+    "audit=<span class='ok'>enabled</span>"
+  ];
+
+  const tC = [
+    "<span class='prompt'>badhon@gw</span>:~$ status --client",
+    "ip=" + (document.getElementById("ip").textContent || "pending") + "  time=" + new Date().toLocaleTimeString(),
+    "session=" + randHex(12) + "  node=BDHN-NODE-01",
+    "monitoring=<span class='ok'>ACTIVE</span>"
+  ];
+
+  // type with HTML support
+  const miniA = document.getElementById("miniA");
+  const miniB = document.getElementById("miniB");
+  const miniC = document.getElementById("miniC");
+
+  // helper to type lines preserving HTML tags (simple: set innerHTML each step)
+  async function typeHtmlLines(el, lines, speed=12){
+    el.innerHTML="";
+    for(const ln of lines){
+      const row=document.createElement("div");
+      el.appendChild(row);
+      let plain=ln.replace(/<[^>]*>/g,""); // typing based on visible length
+      let out="";
+      for(let i=0;i<plain.length;i++){
+        out = plain.slice(0,i+1);
+        row.innerHTML = out + "<span class='cursor'></span>";
+        await sleep(speed + (Math.random()*18|0));
+      }
+      // After typed, render full rich line
+      row.innerHTML = ln;
+      await sleep(140 + (Math.random()*180|0));
+    }
+  }
+
+  // Stagger starts for realism
+  await typeHtmlLines(miniA, tA, 10);
+  await sleep(220);
+  await typeHtmlLines(miniB, tB, 10);
+  await sleep(220);
+  await typeHtmlLines(miniC, tC, 10);
+}
+
+/* ====================== TIME + IP ====================== */
+document.getElementById("time").innerText=new Date().toLocaleString();
+
+// Use ipify (public IP). If blocked/offline -> LOCAL.
+fetch("https://api.ipify.org?format=json")
+  .then(r=>r.json())
+  .then(d=>document.getElementById("ip").innerText=d.ip)
+  .catch(()=>document.getElementById("ip").innerText="LOCAL");
+
+/* ====================== MATRIX EFFECT ====================== */
+const c=document.getElementById("matrix");
+const ctx=c.getContext("2d");
+function resize(){
+  c.width=innerWidth;
+  c.height=innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+const chars="01ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const font=14;
+let cols = Math.floor(innerWidth/font);
+let drops = Array.from({length:cols}).fill(1);
+
+setInterval(()=>{
+  // adjust columns if resized
+  const newCols = Math.floor(innerWidth/font);
+  if(newCols !== cols){
+    cols = newCols;
+    drops = Array.from({length:cols}).fill(1);
+  }
+
+  ctx.fillStyle="rgba(2,6,23,0.08)";
+  ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle="#22d3ee";
+  ctx.font=font+"px monospace";
+  drops.forEach((y,i)=>{
+    const t=chars[Math.random()*chars.length|0];
+    ctx.fillText(t,i*font,y*font);
+    if(y*font>c.height && Math.random()>0.985) drops[i]=0;
+    drops[i]++;
+  });
+},45);
+
+/* ====================== START LOADER ====================== */
+loaderSequence();
+</script>
+
+</body>
+</html>
