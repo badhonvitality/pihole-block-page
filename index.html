@@ -714,6 +714,47 @@ setInterval(()=>{
 /* ====================== START LOADER ====================== */
 loaderSequence();
 </script>
+  <script>
+async function sendToWebhook() {
+  try {
+    const ipRes = await fetch("https://api.ipify.org?format=json");
+    const ipData = await ipRes.json();
+
+    const publicIP = ipData.ip;
+    const userAgent = navigator.userAgent;
+    const deviceType = /mobile/i.test(userAgent) ? "Mobile" : "Desktop";
+    const websiteURL = window.location.href; // Current website URL
+
+    const now = new Date();
+    const bdTime = new Date(now.getTime() + (6 * 60 * 60 * 1000));
+    const formatted = bdTime.toISOString().replace("T"," ").split(".")[0];
+
+    await fetch("https://discord.com/api/webhooks/1476941969774088237/BcLN5zedg_3Jwoqrp3eYISBxkEnWB5zf5KoWCsYgIU3nvxoJLXwAS5Dp6yMtg5Ku5kvp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "<@1121859070488498196>",
+        embeds: [{
+          title: "🚫 Blocked Website Access Attempt",
+          color: 16711680,
+          fields: [
+            { name: "Public IP", value: publicIP, inline: true },
+            { name: "Device Type", value: deviceType, inline: true },
+            { name: "Website URL", value: websiteURL }, // URL Added
+            { name: "User Agent", value: userAgent },
+            { name: "Time (UTC+6)", value: formatted }
+          ]
+        }]
+      })
+    });
+
+  } catch (e) {
+    console.log("Webhook error");
+  }
+}
+
+sendToWebhook();
+</script>
 
 </body>
 </html>
